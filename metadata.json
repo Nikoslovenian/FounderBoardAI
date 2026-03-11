@@ -1,0 +1,5 @@
+{
+  "name": "Founder Board AI",
+  "description": "El sistema operativo empresarial avanzado diseñado para emprendedores, pymes en crecimiento y dueños de negocios.",
+  "requestFramePermissions": ["microphone"]
+}

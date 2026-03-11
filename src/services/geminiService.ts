@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import { OnboardingData, UserLevel } from "../types";
 import { MENTOR_KNOWLEDGE_BASE } from "../data/knowledgeBase";
 
@@ -83,7 +83,7 @@ export const classifyUser = async (data: OnboardingData): Promise<{ level: UserL
 
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -190,15 +190,15 @@ export const chatWithMentor = async (
     });
   }
 
-  // Use gemini-3-flash-preview for better reliability and speed, but with HIGH thinking for Board
-  const model = "gemini-3-flash-preview";
+  // Use gemini-2.0-flash for better reliability and speed, but with HIGH thinking for Board
+  const model = "gemini-2.0-flash";
   const config: any = {
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ googleSearch: {} }],
   };
   
   if (isBoardSession) {
-    config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+    // thinkingConfig removed for gemini-2.0-flash compatibility
   }
 
   try {
@@ -208,7 +208,7 @@ export const chatWithMentor = async (
       config,
     });
 
-    // Increase timeout to 90s for Board Sessions as ThinkingLevel.HIGH takes time
+        // Increase timeout to 90s for Board Sessions
     const timeoutDuration = isBoardSession ? 90000 : 45000;
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error("Timeout")), timeoutDuration)
@@ -226,7 +226,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string) => 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [
           {
@@ -256,7 +256,7 @@ export const generateSpeech = async (text: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -284,7 +284,7 @@ export const analyzeVideo = async (base64Video: string, mimeType: string, prompt
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [
           {
@@ -323,7 +323,6 @@ export const analyzeVideo = async (base64Video: string, mimeType: string, prompt
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [{ googleSearch: {} }],
-        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
       }
     });
 
@@ -357,7 +356,7 @@ The mentors are:
 They are all DIFFERENT people. Ensure NO REPETITIONS of any person. They are listening to a presentation from the viewer's perspective. In the background, a large digital screen subtly displays the text "${companyName}". The lighting is dramatic and professional, creating a high-stakes atmosphere. First-person perspective.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-2.0-flash',
       contents: [{ text: prompt }],
       config: {
         imageConfig: {

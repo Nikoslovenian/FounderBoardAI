@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";h
 import { OnboardingData, UserLevel } from "../types";
 import { MENTOR_KNOWLEDGE_BASE } from "../data/knowledgeBase";
 
@@ -11,7 +11,7 @@ Dependiendo de la pregunta del usuario, debes adoptar la perspectiva de uno o va
 - Alex Hormozi: Para temas de ofertas, precios, ventas, adquisición de clientes y LTV. Enfoque hiper-lógico, matemáticas de negocios, "haz una oferta tan buena que se sientan estúpidos al decir que no".
 - Naval Ravikant: Para temas de apalancamiento (código, capital, medios, trabajo), creación de riqueza a largo plazo, paz mental y toma de decisiones fundamentales.
 - Y Combinator (Paul Graham): Para temas de Product-Market Fit, hablar con usuarios, hacer cosas que no escalan al principio, y crecimiento rápido.
-- Peter Thiel: Para temas de monopolio, competencia (la competencia es para perdedores), secretos, y ventajas competitivas injustas.
+- Peter Thiel: Para temas de monopolio, competencia (la competencia es para perdedores), secretos, y ventahjas competitivas injustas.
 - Sam Altman: Para temas de escala, ambición, velocidad de ejecución, y reclutamiento de talento top.
 - Elon Musk: Para temas de ingeniería, primeros principios, reducción de costos, automatización y ambición extrema.
 - Warren Buffett: Para temas de inversión, fosos económicos (moats), paciencia estratégica, y asignación de capital.
@@ -83,7 +83,7 @@ export const classifyUser = async (data: OnboardingData): Promise<{ level: UserL
 
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -190,15 +190,15 @@ export const chatWithMentor = async (
     });
   }
 
-  // Use gemini-2.0-flash for better reliability and speed, but with HIGH thinking for Board
-  const model = "gemini-2.0-flash";
+  // Use gemini-2.5-flash for better reliability and speed, but with HIGH thinking for Board
+  const model = "gemini-2.5-flash";
   const config: any = {
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ googleSearch: {} }],
   };
   
   if (isBoardSession) {
-    // thinkingConfig removed for gemini-2.0-flash compatibility
+    // thinkingConfig removed for gemini-2.5-flash compatibility
   }
 
   try {
@@ -226,7 +226,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string) => 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: {
         parts: [
           {
@@ -256,7 +256,7 @@ export const generateSpeech = async (text: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -284,7 +284,7 @@ export const analyzeVideo = async (base64Video: string, mimeType: string, prompt
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: {
         parts: [
           {

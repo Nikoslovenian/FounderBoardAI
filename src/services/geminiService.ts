@@ -356,7 +356,7 @@ The mentors are:
 They are all DIFFERENT people. Ensure NO REPETITIONS of any person. They are listening to a presentation from the viewer's perspective. In the background, a large digital screen subtly displays the text "${companyName}". The lighting is dramatic and professional, creating a high-stakes atmosphere. First-person perspective.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-preview-image-generation',
+      model: 'gemini-2.0-flash-exp',
       contents: [{ text: prompt }],
       config: {
         responseModalities: [Modality.IMAGE],

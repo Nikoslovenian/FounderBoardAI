@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";h
+import { GoogleGenAI, Modality } from "@google/genai";
 import { OnboardingData, UserLevel } from "../types";
 import { MENTOR_KNOWLEDGE_BASE } from "../data/knowledgeBase";
 

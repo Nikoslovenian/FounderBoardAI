@@ -6,31 +6,31 @@ import { Brain, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { setUserProfile } = useAppContext();
+  const { login } = useAppContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    const storedProfile = localStorage.getItem('founder_board_profile');
-    if (!storedProfile) {
-      setError('No se encontró ninguna cuenta. Por favor, regístrate primero.');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      const profile = JSON.parse(storedProfile);
-      if (profile.data.founderEmail === email && profile.data.password === password) {
-        setUserProfile(profile);
-        navigate('/dashboard');
-      } else {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('Email o contraseña incorrectos.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Formato de email inválido.');
+      } else {
+        setError('Error al iniciar sesión. Por favor intente nuevamente.');
       }
-    } catch (e) {
-      setError('Error al procesar los datos de la cuenta.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -89,10 +89,11 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+            disabled={isLoading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
           >
-            Ingresar al Directorio
-            <ArrowRight className="w-5 h-5" />
+            {isLoading ? 'Ingresando...' : 'Ingresar al Directorio'}
+            {!isLoading && <ArrowRight className="w-5 h-5" />}
           </button>
 
           <div className="text-center pt-4">

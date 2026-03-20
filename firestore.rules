@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: uid
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - role: string (required, ['admin', 'kam', 'company'])
+    //   - displayName: string (optional)
+    //   - companyId: string (optional)
+    //   - kamId: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: companies
+    // Document ID: companyId
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - rut: string (required)
+    //   - kamId: string (required)
+    //   - onboardingData: map (optional)
+    //   - status: string (required, ['pending', 'active', 'archived'])
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: invitations
+    // Document ID: invitationId
+    // Fields:
+    //   - id: string (required)
+    //   - email: string (required)
+    //   - companyId: string (required)
+    //   - kamId: string (required)
+    //   - code: string (required)
+    //   - status: string (required, ['sent', 'accepted', 'expired'])
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        (request.auth.token.email == "nikogenetic@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isKAM() {
+      return isAuthenticated() && getUserData().role == 'kam';
+    }
+
+    function isCompany() {
+      return isAuthenticated() && getUserData().role == 'company';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function belongsToCompany(companyId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (isKAM() && get(/databases/$(database)/documents/companies/$(companyId)).data.kamId == request.auth.uid) ||
+        (isCompany() && getUserData().companyId == companyId)
+      );
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['admin', 'kam', 'company'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidCompany(data) {
+      return data.keys().hasAll(['id', 'name', 'rut', 'kamId', 'status', 'createdAt']) &&
+             data.id is string &&
+             data.name is string &&
+             data.rut is string &&
+             data.kamId is string &&
+             data.status in ['pending', 'active', 'archived'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidInvitation(data) {
+      return data.keys().hasAll(['id', 'email', 'companyId', 'kamId', 'code', 'status', 'createdAt']) &&
+             data.id is string &&
+             data.email is string &&
+             data.companyId is string &&
+             data.kamId is string &&
+             data.code is string &&
+             data.status in ['sent', 'accepted', 'expired'] &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (isOwner(uid) || isAdmin());
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
+        isOwner(uid) || isAdmin()
+      );
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(uid) && request.resource.data.role == resource.data.role) || isAdmin()
+      );
+    }
+
+    match /companies/{companyId} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if isAuthenticated() && (isAdmin() || isKAM()) && isValidCompany(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || (isKAM() && resource.data.kamId == request.auth.uid)) && isValidCompany(request.resource.data);
+      allow delete: if isAdmin();
+
+      // Subcollections
+      match /{allSubcollections=**} {
+        allow read, write: if belongsToCompany(companyId);
+      }
+    }
+
+    match /invitations/{invitationId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        (isKAM() && resource.data.kamId == request.auth.uid) ||
+        (request.auth.token.email == resource.data.email)
+      );
+      allow create: if isAuthenticated() && (isAdmin() || isKAM()) && isValidInvitation(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (isKAM() && resource.data.kamId == request.auth.uid) ||
+        (request.auth.token.email == resource.data.email && request.resource.data.status == 'accepted')
+      );
+      allow delete: if isAdmin() || (isKAM() && resource.data.kamId == request.auth.uid);
+    }
+  }
+}

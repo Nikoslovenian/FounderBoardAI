@@ -1,5 +1,5 @@
-import { GoogleGenAI, Modality } from "@google/genai";
-import { OnboardingData, UserLevel } from "../types";
+import { GoogleGenAI, Modality, ThinkingLevel, Type } from "@google/genai";
+import { OnboardingData, UserLevel, TaxData, TaxDocument, Employee } from "../types";
 import { MENTOR_KNOWLEDGE_BASE } from "../data/knowledgeBase";
 
 const SYSTEM_PROMPT = `Eres "Founder Board AI", el sistema operativo empresarial avanzado diseñado para emprendedores, pymes en crecimiento y dueños de negocios que facturan más de 100M CLP al año.
@@ -11,7 +11,7 @@ Dependiendo de la pregunta del usuario, debes adoptar la perspectiva de uno o va
 - Alex Hormozi: Para temas de ofertas, precios, ventas, adquisición de clientes y LTV. Enfoque hiper-lógico, matemáticas de negocios, "haz una oferta tan buena que se sientan estúpidos al decir que no".
 - Naval Ravikant: Para temas de apalancamiento (código, capital, medios, trabajo), creación de riqueza a largo plazo, paz mental y toma de decisiones fundamentales.
 - Y Combinator (Paul Graham): Para temas de Product-Market Fit, hablar con usuarios, hacer cosas que no escalan al principio, y crecimiento rápido.
-- Peter Thiel: Para temas de monopolio, competencia (la competencia es para perdedores), secretos, y ventahjas competitivas injustas.
+- Peter Thiel: Para temas de monopolio, competencia (la competencia es para perdedores), secretos, y ventajas competitivas injustas.
 - Sam Altman: Para temas de escala, ambición, velocidad de ejecución, y reclutamiento de talento top.
 - Elon Musk: Para temas de ingeniería, primeros principios, reducción de costos, automatización y ambición extrema.
 - Warren Buffett: Para temas de inversión, fosos económicos (moats), paciencia estratégica, y asignación de capital.
@@ -35,6 +35,10 @@ REGLAS DE ORO:
 - Cada recomendación debe impactar ingresos, margen o ventaja.
 - Siempre devuelve: Diagnóstico -> Decisión -> Plan -> Métrica.
 - PERSONALIZACIÓN: Siempre dirígete al fundador por su nombre (si está disponible en el contexto) para hacer la interacción más humana y directa.
+- DATOS TRIBUTARIOS: Si hay información de Carpetas Tributarias en el contexto, ÚSALA para validar las finanzas del usuario. No asumas datos si tienes los oficiales del SII. Si detectas inconsistencias entre lo que el usuario dice y lo que dice el SII, señálalo con firmeza (estilo Hormozi o Buffett).
+- SUGERENCIA DE MÉTRICAS: Al final de tu respuesta (fuera de las etiquetas de mentor, pero dentro de la respuesta general), si identificas que el usuario debería estar monitoreando métricas específicas basadas en la conversación, incluye una sección con la etiqueta [METRICS] seguida de los IDs de las métricas relevantes separados por comas. 
+  IDs disponibles: CAC, LTV, CHURN, MRR, BURN_RATE, CONVERSION_RATE, NPS, ROAS, PAYBACK_PERIOD, SALES_VELOCITY.
+  Ejemplo: [METRICS] CAC, LTV, ROAS [/METRICS]
 
 FORMATO DE RESPUESTA OBLIGATORIO (MULTI-AVATAR):
 Cuando respondas, DEBES estructurar tu respuesta dividiéndola por los mentores que están hablando. Usa EXACTAMENTE estas etiquetas para separar las intervenciones:
@@ -83,7 +87,7 @@ export const classifyUser = async (data: OnboardingData): Promise<{ level: UserL
 
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -104,13 +108,90 @@ export const classifyUser = async (data: OnboardingData): Promise<{ level: UserL
   }
 };
 
+export async function analyzeTaxDocument(base64Data: string): Promise<TaxData | null> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: base64Data
+              }
+            },
+            {
+              text: `Analiza esta Carpeta Tributaria del SII (Chile) y extrae los datos financieros clave. 
+              Identifica datos del Formulario 22 (F22) y Formulario 29 (F29).
+              Devuelve un JSON con los campos: 
+              - revenue (ingresos brutos anuales)
+              - profit (utilidad neta aproximada)
+              - taxesPaid (impuestos pagados)
+              - employees (número de empleados)
+              - lastUpdated (fecha de emisión)
+              - period (periodo tributario analizado, ej: '2023-2024')
+              - f22Data (objeto con baseImponible, impuestoDeterminado, gastosRechazados)
+              - f29Data (objeto con ivaDebito, ivaCredito, ppm)
+              - summaryText (un resumen ejecutivo de 3 párrafos sobre la salud financiera, riesgos detectados y oportunidades de optimización fiscal basado en los datos leídos).`
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            revenue: { type: Type.NUMBER },
+            profit: { type: Type.NUMBER },
+            taxesPaid: { type: Type.NUMBER },
+            employees: { type: Type.NUMBER },
+            lastUpdated: { type: Type.STRING },
+            period: { type: Type.STRING },
+            f22Data: {
+              type: Type.OBJECT,
+              properties: {
+                baseImponible: { type: Type.NUMBER },
+                impuestoDeterminado: { type: Type.NUMBER },
+                gastosRechazados: { type: Type.NUMBER }
+              }
+            },
+            f29Data: {
+              type: Type.OBJECT,
+              properties: {
+                ivaDebito: { type: Type.NUMBER },
+                ivaCredito: { type: Type.NUMBER },
+                ppm: { type: Type.NUMBER }
+              }
+            },
+            summaryText: { type: Type.STRING }
+          },
+          required: ["revenue", "profit", "taxesPaid", "employees", "lastUpdated", "period", "summaryText"]
+        }
+      }
+    });
+
+    if (response.text) {
+      return JSON.parse(response.text);
+    }
+    return null;
+  } catch (error) {
+    console.error("Error analyzing tax document:", error);
+    return null;
+  }
+}
+
 export const chatWithMentor = async (
   message: string,
   level: UserLevel,
   isBoardSession: boolean,
   fileData?: { mimeType: string; data: string },
   userData?: OnboardingData,
-  selectedMentor?: string
+  selectedMentor?: string,
+  taxDocs?: TaxDocument[],
+  employees?: Employee[]
 ) => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const mentorNames: Record<string, string> = {
@@ -175,6 +256,33 @@ export const chatWithMentor = async (
     - Meta: ${userData.goal}
     ` : ''}
     
+    ${employees && employees.length > 0 ? `
+    DATOS CAPITAL HUMANO (Registro Laboral):
+    ${employees.map(emp => `
+    - Nombre: ${emp.fullName}
+    - RUT: ${emp.rut}
+    - Cargo: ${emp.position}
+    - Sueldo Base: ${emp.baseSalary}
+    - Tipo Contrato: ${emp.contractType}
+    - Jornada: ${emp.workday}
+    - Fecha Inicio: ${emp.startDate}
+    - Estado: ${emp.status}
+    `).join('\n')}
+    ` : ''}
+
+    ${taxDocs && taxDocs.length > 0 ? `
+    DATOS OFICIALES SII (Chile):
+    ${taxDocs.map(doc => `
+    - Periodo: ${doc.period}
+    - Ingresos: ${doc.extractedData?.revenue}
+    - Utilidad: ${doc.extractedData?.profit}
+    - Empleados: ${doc.extractedData?.employees}
+    - F22 Base Imponible: ${doc.extractedData?.f22Data?.baseImponible}
+    - F29 IVA Débito: ${doc.extractedData?.f29Data?.ivaDebito}
+    - Resumen IA: ${doc.extractedData?.summaryText}
+    `).join('\n')}
+    ` : ''}
+    
     ${modePrompt}
     
     Mensaje del usuario: ${message}
@@ -190,15 +298,15 @@ export const chatWithMentor = async (
     });
   }
 
-  // Use gemini-2.5-flash for better reliability and speed, but with HIGH thinking for Board
-  const model = "gemini-2.5-flash";
+  // Use gemini-3-flash-preview for better reliability and speed, but with HIGH thinking for Board
+  const model = "gemini-3-flash-preview";
   const config: any = {
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ googleSearch: {} }],
   };
   
   if (isBoardSession) {
-    // thinkingConfig removed for gemini-2.5-flash compatibility
+    config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
   }
 
   try {
@@ -208,7 +316,7 @@ export const chatWithMentor = async (
       config,
     });
 
-        // Increase timeout to 90s for Board Sessions
+    // Increase timeout to 90s for Board Sessions as ThinkingLevel.HIGH takes time
     const timeoutDuration = isBoardSession ? 90000 : 45000;
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error("Timeout")), timeoutDuration)
@@ -226,7 +334,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string) => 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           {
@@ -256,7 +364,7 @@ export const generateSpeech = async (text: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -284,7 +392,7 @@ export const analyzeVideo = async (base64Video: string, mimeType: string, prompt
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const responsePromise = ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-pro-preview",
       contents: {
         parts: [
           {
@@ -323,6 +431,7 @@ export const analyzeVideo = async (base64Video: string, mimeType: string, prompt
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [{ googleSearch: {} }],
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
       }
     });
 
@@ -356,10 +465,9 @@ The mentors are:
 They are all DIFFERENT people. Ensure NO REPETITIONS of any person. They are listening to a presentation from the viewer's perspective. In the background, a large digital screen subtly displays the text "${companyName}". The lighting is dramatic and professional, creating a high-stakes atmosphere. First-person perspective.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash-image',
       contents: [{ text: prompt }],
       config: {
-        responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
         },

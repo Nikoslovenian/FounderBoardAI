@@ -6,12 +6,12 @@ import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
 
 export default function StrategicPlanning() {
-  const { userProfile } = useAppContext();
+  const { company } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
 
   const generatePlan = async () => {
-    if (!userProfile) return;
+    if (!company?.onboardingData) return;
     setLoading(true);
     
     try {
@@ -22,13 +22,13 @@ export default function StrategicPlanning() {
         Como un experto estratega de negocios y mentor de startups, ayuda a este fundador a definir su plan estratégico.
         
         DATOS DEL FUNDADOR:
-        - Nombre: ${userProfile.data.founderName}
-        - Empresa: ${userProfile.data.companyName}
-        - Industria: ${userProfile.data.industry}
-        - Etapa: ${userProfile.data.stage}
-        - Ingresos actuales: ${userProfile.data.revenue}
-        - Meta a 12 meses: ${userProfile.data.goal}
-        - Diagnóstico (Scores): ${JSON.stringify(userProfile.scores)}
+        - Nombre: ${company.onboardingData.data.founderName}
+        - Empresa: ${company.onboardingData.data.companyName}
+        - Industria: ${company.onboardingData.data.industry}
+        - Etapa: ${company.onboardingData.data.stage}
+        - Ingresos actuales: ${company.onboardingData.data.revenue}
+        - Meta a 12 meses: ${company.onboardingData.data.goal}
+        - Diagnóstico (Scores): ${JSON.stringify(company.onboardingData.scores)}
         
         TAREAS:
         1. Define OKRs (Objectives and Key Results) trimestrales utilizando la metodología SMART.

@@ -8,8 +8,9 @@ import { Loader2, TrendingUp, Users, Target, DollarSign, Briefcase, Globe, Build
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { setUserProfile } = useAppContext();
+  const { register } = useAppContext();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState<OnboardingData>({
     founderName: '',
     founderEmail: '',
@@ -35,17 +36,19 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
-      const result = await classifyUser(formData);
-      setUserProfile({
-        level: result.level,
-        data: formData,
-        scores: result.scores,
-        metrics: {},
-      });
+      await register(formData);
       navigate('/dashboard');
-    } catch (error) {
-      console.error('Error during classification:', error);
+    } catch (err: any) {
+      console.error('Error during registration:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Este email ya está en uso. Por favor, intenta con otro o inicia sesión.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('La contraseña es muy débil. Debe tener al menos 6 caracteres.');
+      } else {
+        setError('Ocurrió un error al crear tu cuenta. Por favor, intenta de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
@@ -61,6 +64,11 @@ export default function Onboarding() {
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Founder Board AI</h1>
             <p className="text-zinc-400">Diagnóstico inicial para asignar tu nivel operativo.</p>
+            {error && (
+              <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm">
+                {error}
+              </div>
+            )}
             <p className="mt-4 text-sm text-zinc-500">
               ¿Ya tienes una cuenta? {' '}
               <button 

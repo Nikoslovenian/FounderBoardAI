@@ -4,35 +4,39 @@ import { useAppContext } from '../store/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LogOut, Activity, BarChart3, ShieldAlert, Zap, Layers, 
-  MessageSquare, Video, Mic, History, Plus, TrendingUp, Award, Target
+  MessageSquare, Video, Mic, History, Plus, TrendingUp, Award, Target, Landmark, Users, Rocket
 } from 'lucide-react';
 import Chat from '../components/Chat';
 import KPIDashboard from '../components/KPIDashboard';
 import Milestones from '../components/Milestones';
 import StrategicPlanning from '../components/StrategicPlanning';
+import TaxCenter from '../components/TaxCenter';
+import HumanCapital from '../components/HumanCapital';
 
-type DashboardTab = 'chat' | 'kpis' | 'milestones' | 'strategy';
+import AcquisitionStrategy from '../components/AcquisitionStrategy';
+
+type DashboardTab = 'chat' | 'kpis' | 'milestones' | 'strategy' | 'tax' | 'human-capital' | 'acquisition';
 
 export default function Dashboard() {
-  const { userProfile, setUserProfile, sessions, kpis, milestones } = useAppContext();
+  const { profile, company, loading, logout, kpis, milestones, sessions } = useAppContext();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<DashboardTab>('chat');
   const [isBoardSession, setIsBoardSession] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!userProfile) {
-      navigate('/');
+    if (!loading && !profile) {
+      navigate('/login');
     }
-  }, [userProfile, navigate]);
+  }, [profile, loading, navigate]);
 
-  if (!userProfile) {
+  if (loading || !profile) {
     return null;
   }
 
   const handleLogout = () => {
-    setUserProfile(null);
-    navigate('/');
+    logout();
+    navigate('/login');
   };
 
   const handleNewSession = () => {
@@ -41,7 +45,7 @@ export default function Dashboard() {
   };
 
   const getLevelInfo = () => {
-    switch (userProfile.level) {
+    switch (company?.onboardingData?.level) {
       case 'A': return { title: 'Nivel A - Sistema de Validación y Cierre', color: 'text-emerald-500', bg: 'bg-emerald-500/10' };
       case 'B': return { title: 'Nivel B - Sistema de Escala', color: 'text-blue-500', bg: 'bg-blue-500/10' };
       case 'D': return { title: 'Nivel D - Sistema de Directorio Estratégico', color: 'text-rose-500', bg: 'bg-rose-500/10' };
@@ -111,6 +115,33 @@ export default function Dashboard() {
               <Target className="w-4 h-4" />
               Planeación Estratégica
             </button>
+            <button 
+              onClick={() => setActiveTab('acquisition')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'acquisition' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+            >
+              <Rocket className="w-4 h-4" />
+              Adquisición (Core 4)
+            </button>
+            <button 
+              onClick={() => setActiveTab('tax')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'tax' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+            >
+              <Landmark className="w-4 h-4" />
+              Centro Tributario
+            </button>
+            <button 
+              onClick={() => setActiveTab('human-capital')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'human-capital' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Capital Humano
+            </button>
           </div>
 
           <div>
@@ -119,11 +150,11 @@ export default function Dashboard() {
               Diagnóstico Actual
             </h3>
             <div className="space-y-4">
-              {Object.entries(userProfile.scores || {}).map(([key, value]) => (
+              {Object.entries(company?.onboardingData?.scores || {}).map(([key, value]) => (
                 <div key={key} className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-zinc-300">{key}</span>
-                    <span className="text-lg font-bold text-white">{value}</span>
+                    <span className="text-lg font-bold text-white">{value as number}</span>
                   </div>
                   <div className="w-full bg-zinc-800 rounded-full h-1.5">
                     <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${value}%` }}></div>
@@ -237,7 +268,12 @@ export default function Dashboard() {
               </>
             ) : (
               <h2 className="text-sm font-bold text-white uppercase tracking-widest">
-                {activeTab === 'kpis' ? 'KPI Tracking System' : activeTab === 'milestones' ? 'Growth Milestones' : 'Strategic Planning'}
+                {activeTab === 'kpis' ? 'KPI Tracking System' : 
+                 activeTab === 'milestones' ? 'Growth Milestones' : 
+                 activeTab === 'tax' ? 'Centro Tributario SII' :
+                 activeTab === 'human-capital' ? 'Gestión de Capital Humano' :
+                 activeTab === 'acquisition' ? 'Estrategia de Adquisición Core 4' :
+                 'Strategic Planning'}
               </h2>
             )}
           </div>
@@ -257,7 +293,7 @@ export default function Dashboard() {
                 <Chat 
                   key={currentSessionId || 'new'} 
                   isBoardSession={isBoardSession} 
-                  level={userProfile.level!} 
+                  level={company?.onboardingData?.level!} 
                   initialSessionId={currentSessionId}
                 />
               </motion.div>
@@ -293,6 +329,39 @@ export default function Dashboard() {
                 className="h-full"
               >
                 <StrategicPlanning />
+              </motion.div>
+            )}
+            {activeTab === 'tax' && (
+              <motion.div 
+                key="tax"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="h-full"
+              >
+                <TaxCenter />
+              </motion.div>
+            )}
+            {activeTab === 'human-capital' && (
+              <motion.div 
+                key="human-capital"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="h-full"
+              >
+                <HumanCapital />
+              </motion.div>
+            )}
+            {activeTab === 'acquisition' && (
+              <motion.div 
+                key="acquisition"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="h-full"
+              >
+                <AcquisitionStrategy />
               </motion.div>
             )}
           </AnimatePresence>

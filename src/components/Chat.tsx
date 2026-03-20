@@ -1,12 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Mic, Video, Paperclip, Loader2, Play, Square, Volume2, Layers, MessageSquare, X, Image as ImageIcon, Target, Brain, Rocket, TrendingUp, Zap, Crown, FileText, Cpu, Landmark, Sparkles, Info } from 'lucide-react';
+import { Send, Mic, Video, Paperclip, Loader2, Play, Square, Volume2, Layers, MessageSquare, X, Image as ImageIcon, Target, Brain, Rocket, TrendingUp, Zap, Crown, FileText, Cpu, Landmark, Sparkles, Info, Activity, CheckCircle2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { chatWithMentor, transcribeAudio, analyzeVideo, generateSpeech, generateBoardRoomImage } from '../services/geminiService';
-import { Message, UserLevel } from '../types';
+import { Message, UserLevel, KPI } from '../types';
 import { CONCEPTS } from '../data/concepts';
+import { BUSINESS_KPIS } from '../data/kpis';
 
 import { useAppContext } from '../store/AppContext';
+
+const parseMetrics = (content: string) => {
+  const regex = /\[METRICS\]([\s\S]*?)\[\/METRICS\]/g;
+  const match = regex.exec(content);
+  if (!match) return [];
+  
+  return match[1]
+    .split(',')
+    .map(id => id.trim().toUpperCase())
+    .filter(id => BUSINESS_KPIS[id])
+    .map(id => BUSINESS_KPIS[id]);
+};
+
+const cleanContent = (content: string) => {
+  return content.replace(/\[METRICS\][\s\S]*?\[\/METRICS\]/g, '').trim();
+};
 
 const highlightConcepts = (text: string) => {
   let processed = text;
@@ -203,7 +220,7 @@ interface ChatProps {
 }
 
 export default function Chat({ isBoardSession, level, initialSessionId }: ChatProps) {
-  const { userProfile, saveSession, sessions, loadSession } = useAppContext();
+  const { profile, company, saveSession, sessions, loadSession, taxDocuments, employees, addKPI, kpis } = useAppContext();
   const [sessionId, setSessionId] = useState<string>(() => initialSessionId || Date.now().toString());
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -228,15 +245,18 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
   const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
-    if (initialSessionId) {
-      const session = loadSession(initialSessionId);
-      if (session) {
-        setMessages(session.messages);
-        if (session.selectedMentor && !isBoardSession) {
-          setSelectedMentor(session.selectedMentor);
+    const initSession = async () => {
+      if (initialSessionId) {
+        const session = await loadSession(initialSessionId);
+        if (session) {
+          setMessages(session.messages);
+          if (session.selectedMentor && !isBoardSession) {
+            setSelectedMentor(session.selectedMentor);
+          }
         }
       }
-    }
+    };
+    initSession();
   }, [initialSessionId, loadSession, isBoardSession]);
 
   useEffect(() => {
@@ -259,15 +279,15 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
 
   useEffect(() => {
     const initBoardRoom = async () => {
-      if (isBoardSession && userProfile && !boardRoomImage && !isGeneratingBoardImage) {
+      if (isBoardSession && company?.onboardingData && !boardRoomImage && !isGeneratingBoardImage) {
         setIsGeneratingBoardImage(true);
-        const img = await generateBoardRoomImage(userProfile.data.founderName, userProfile.data.companyName);
+        const img = await generateBoardRoomImage(company.onboardingData.data.founderName, company.onboardingData.data.companyName);
         setBoardRoomImage(img);
         setIsGeneratingBoardImage(false);
       }
     };
     initBoardRoom();
-  }, [isBoardSession, userProfile, boardRoomImage, isGeneratingBoardImage]);
+  }, [isBoardSession, company?.onboardingData, boardRoomImage, isGeneratingBoardImage]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -325,12 +345,12 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
       let responseText = '';
       
       if (type === 'video' && fileData) {
-        responseText = await analyzeVideo(fileData.data, fileData.mimeType, text || 'Analiza este video y dame un diagnóstico.', userProfile?.data);
+        responseText = await analyzeVideo(fileData.data, fileData.mimeType, text || 'Analiza este video y dame un diagnóstico.', company?.onboardingData?.data);
       } else if (type === 'audio' && fileData) {
         const transcription = await transcribeAudio(fileData.data, fileData.mimeType);
-        responseText = await chatWithMentor(`Audio transcrito: "${transcription}". ${text}`, level, isBoardSession, undefined, userProfile?.data, selectedMentor);
+        responseText = await chatWithMentor(`Audio transcrito: "${transcription}". ${text}`, level, isBoardSession, undefined, company?.onboardingData?.data, selectedMentor, taxDocuments, employees);
       } else {
-        responseText = await chatWithMentor(text, level, isBoardSession, fileData, userProfile?.data, selectedMentor);
+        responseText = await chatWithMentor(text, level, isBoardSession, fileData, company?.onboardingData?.data, selectedMentor, taxDocuments, employees);
       }
 
       const assistantMessage: Message = {
@@ -455,6 +475,8 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
     }
   };
 
+  const currentTheme = isBoardSession ? MENTOR_UI.BOARD.theme : MENTOR_UI[selectedMentor as keyof typeof MENTOR_UI].theme;
+
   const playTTS = async (text: string, messageId: string) => {
     if (playingAudioId === messageId) return;
     
@@ -474,7 +496,20 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
     }
   };
 
-  const currentTheme = isBoardSession ? MENTOR_UI.BOARD.theme : MENTOR_UI[selectedMentor as keyof typeof MENTOR_UI].theme;
+  const handleTrackKPI = (kpiInfo: any) => {
+    const alreadyTracking = kpis.some(k => k.id === kpiInfo.id);
+    if (alreadyTracking) return;
+
+    const newKPI: KPI = {
+      id: kpiInfo.id,
+      name: kpiInfo.name,
+      unit: kpiInfo.id === 'CONVERSION_RATE' || kpiInfo.id === 'CHURN' || kpiInfo.id === 'NPS' ? '%' : '$',
+      chartType: 'line',
+      data: [],
+      color: '#10b981', // emerald-500
+    };
+    addKPI(newKPI);
+  };
 
   return (
     <div 
@@ -794,7 +829,7 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
                       </button>
                     </div>
 
-                    {parseMentorTags(msg.content, msg.mentor || (msg.isBoardSession ? 'BOARD' : selectedMentor)).map((segment, idx) => {
+                    {parseMentorTags(cleanContent(msg.content), msg.mentor || (msg.isBoardSession ? 'BOARD' : selectedMentor)).map((segment, idx) => {
                       const mentorKey = segment.mentor as keyof typeof MENTOR_UI;
                       const ui = MENTOR_UI[mentorKey] || MENTOR_UI.BOARD;
                       const Icon = ui.icon;
@@ -850,6 +885,41 @@ export default function Chat({ isBoardSession, level, initialSessionId }: ChatPr
                         </div>
                       );
                     })}
+
+                    {msg.role === 'assistant' && parseMetrics(msg.content).length > 0 && (
+                      <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Activity className="w-4 h-4 text-emerald-400" />
+                          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Métricas Sugeridas</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {parseMetrics(msg.content).map((kpi) => {
+                            const isTracking = kpis.some(k => k.id === kpi.id);
+                            return (
+                              <div key={kpi.id} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl flex flex-col gap-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-sm font-bold text-zinc-200">{kpi.name}</span>
+                                  {isTracking ? (
+                                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      Traking
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => handleTrackKPI(kpi)}
+                                      className="text-[10px] font-bold text-zinc-500 hover:text-emerald-400 uppercase transition-colors"
+                                    >
+                                      + Trackear
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="text-xs text-zinc-500 leading-relaxed">{kpi.description}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {msg.isBoardSession && (
                       <div className="mt-4 pt-4 border-t border-zinc-800/50 flex flex-wrap gap-2">

@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with specific roles and permissions",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "kam", "company"] },
+        "displayName": { "type": "string" },
+        "companyId": { "type": "string", "description": "Reference to the company if role is 'company'" },
+        "kamId": { "type": "string", "description": "Reference to the KAM if role is 'company'" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "A portfolio company managed by a KAM",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "rut": { "type": "string" },
+        "kamId": { "type": "string", "description": "The KAM managing this company" },
+        "onboardingData": { "$ref": "OnboardingData" },
+        "status": { "type": "string", "enum": ["pending", "active", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "kamId"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Invitation sent to a company to join the platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "companyId": { "type": "string" },
+        "kamId": { "type": "string" },
+        "code": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "accepted", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "companyId", "kamId", "code"]
+    },
+    "OnboardingData": {
+      "title": "OnboardingData",
+      "description": "Detailed business data for a company",
+      "type": "object",
+      "properties": {
+        "founderName": { "type": "string" },
+        "founderEmail": { "type": "string" },
+        "founderPhone": { "type": "string" },
+        "companyName": { "type": "string" },
+        "companyRut": { "type": "string" },
+        "stage": { "type": "string" },
+        "revenue": { "type": "string" },
+        "margin": { "type": "string" },
+        "customers": { "type": "string" },
+        "acquisition": { "type": "string" },
+        "team": { "type": "string" },
+        "goal": { "type": "string" },
+        "industry": { "type": "string" },
+        "countries": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    },
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Company data and portfolio management"
+    },
+    "/invitations/{invitationId}": {
+      "schema": "Invitation",
+      "description": "Company invitations"
+    },
+    "/companies/{companyId}/kpis/{kpiId}": {
+      "schema": "KPI",
+      "description": "Company performance metrics"
+    },
+    "/companies/{companyId}/milestones/{milestoneId}": {
+      "schema": "Milestone",
+      "description": "Company milestones"
+    },
+    "/companies/{companyId}/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Company employee records"
+    },
+    "/companies/{companyId}/taxDocuments/{docId}": {
+      "schema": "TaxDocument",
+      "description": "Company tax documents"
+    },
+    "/companies/{companyId}/sessions/{sessionId}": {
+      "schema": "ChatSession",
+      "description": "Mentoring sessions"
+    }
+  }
+}
